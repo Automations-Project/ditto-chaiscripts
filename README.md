@@ -1,475 +1,125 @@
-# Ditto ChaiScripts Collection
+# Ditto ChaiScripts (JSON / JS Minifiers)
 
-**Production-Grade ChaiScript Minifiers & Utilities for Ditto Clipboard Manager**
+Small clipboard minifiers for [Ditto Clipboard Manager](https://github.com/sabrogden/Ditto).
 
-[![GitHub Release](https://img.shields.io/github/v/release/yourusername/ditto-chaiscripts)](https://github.com/yourusername/ditto-chaiscripts/releases)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://github.com/sabrogden/Ditto)
-[![Ditto Compatible](https://img.shields.io/badge/Ditto-3.21%2B-brightgreen.svg)](https://github.com/sabrogden/Ditto)
+This repo exists mainly to help people (especially **n8n users**) copy large JSON workflows or JavaScript snippets and paste them into AI tools (ChatGPT/Claude/etc.) with fewer wasted tokens.
 
----
+Context / feature request in Ditto:
 
-## - Overview
+- https://github.com/sabrogden/Ditto/issues/1046
 
-A curated collection of **high-performance ChaiScript automation scripts** for [Ditto Clipboard Manager](https://github.com/sabrogden/Ditto). These production-ready scripts focus on **intelligent minification** of JSON and JavaScript code during copy/paste operations.
+## What scripts are included
 
-### Key Features
+- [`UnifiedMinify.chai`](UnifiedMinify.chai) (recommended)
+  - Automatically detects **JSON vs JavaScript** and runs the right minifier.
+- [`JsonMinify.chai`](JsonMinify.chai)
+  - JSON-only minifier.
+- [`JSMinify.chai`](JSMinify.chai)
+  - JavaScript-only minifier (tries hard to avoid running on JSON).
 
-âœ… **Automatic Content Detection** - Intelligent JSON/JavaScript identification
-âœ… **Production Grade** - Handles edge cases, escape sequences, comments
-âœ… **Non-Destructive** - Only minifies when safe, preserves content integrity
-âœ… **Performance Optimized** - Size guards, early exits, minimal overhead
-âœ… **Comment Preservation** - Retains single & block comments in JS
-âœ… **Error Prevention** - Validates braces, brackets, escape sequences
+## Quick start (copy/paste into Ditto)
 
----
+These scripts are designed to run as **On Copy** scripts.
+If you prefer to keep the original (pretty) JSON in your Ditto history and only minify right before pasting into ChatGPT/Claude/etc., you can also use them as **On Paste** scripts.
 
-## - Scripts Included
+1. Open **Ditto**.
+2. Go to `Options` -> `Advanced` -> `On Copy Scripts`.
+3. Add a new script.
+4. Open [`UnifiedMinify.chai`](UnifiedMinify.chai) in this repo, copy all of it, and paste it into the Ditto script editor.
+5. Enable the script and click `OK`.
+6. Copy formatted JSON or JavaScript, then paste somewhere (Notepad is fine) to confirm it was minified.
 
-### 1. **JsonMinify.chai** - JSON Minification on Copy
-Automatically minifies JSON when copied to clipboard.
+![Ditto: On Copy Scripts](docs/screenshots/image.png)
 
-**Features:**
-- Validates JSON structure before processing (brace/bracket matching)
-- Removes all whitespace: newlines, tabs, carriage returns
-- Eliminates spaces after colons and commas
-- Removes spaces around braces `{}` and brackets `[]`
-- Skips already-minified content (early exit optimization)
-- Size guard: ignores clips >1MB
-- Smart detection: requires `{` or `[` start after trimming
+Optional (On Paste setup):
 
-**Use Case:** Copy formatted JSON from editor/API response â†’ Auto-minified in clipboard
+1. Go to `Options` -> `Advanced` -> `On Paste Scripts`.
+2. Add the script the same way (copy/paste contents).
 
-**File Size:** 2.5 KB
+Notes:
 
----
+- Enable **only one** of these minifier scripts at a time (otherwise you may process the same text twice).
+- Ditto scripting is **ASCII-only** (`clip.GetAsciiString()`), which is a Ditto/ChaiScript limitation.
 
-### 2. **JSMinify.chai** - JavaScript Minification on Copy
-Strict JavaScript detection and minification (excludes JSON).
+## n8n: why this helps
 
-**Features:**
-- **Strict Detection**: Requires â‰¥2 JavaScript indicators (function, arrow, const/let/var, class, import/export)
-- **Rejects JSON**: Explicitly prevents JSON minification (delegates to JsonMinify)
-- Preserves line comments (`//`) and block comments (`/* */`)
-- Maintains shebang lines (`#!/usr/bin/env node`)
-- Smart whitespace: preserves spaces between identifiers
-- Handles escape sequences and template literals
-- Size guard: ignores clips >500KB
+n8n users frequently copy:
 
-**JavaScript Indicators Detected:**
-- `function`, `function(` (functions)
-- `=>` (arrow functions)
-- `const`, `let`, `var` (declarations)
-- `class` (class definitions)
-- `import`, `export` (ES6 modules)
-- `for (`, `for(` (loops)
-- `if (`, `if(` (conditionals)
-- `return `, `return;` (return statements)
+- Workflow exports (large JSON)
+- Code/Function node snippets (JavaScript)
 
-**Use Case:** Copy expanded JavaScript code â†’ Auto-minified while preserving comments
+Pretty-printed JSON wastes AI tokens because whitespace becomes tokens. Minifying often reduces the size of workflow JSON dramatically (commonly 40-60% smaller).
 
-**File Size:** 4.8 KB
+Example n8n workflow export:
 
----
+1. Export workflow (JSON) in n8n.
+2. Copy it.
+3. Ditto minifies automatically.
+4. Paste into ChatGPT/Claude to review or refactor the workflow.
 
-### 3. **UnifiedMinify.chai** - Unified JSON & JavaScript Detection
-Single script that intelligently routes between JSON and JavaScript minification.
+## How the scripts behave (high level)
 
-**Features:**
-- **Automatic Branching**: Detects content type and applies appropriate minification
-- **JSON Branch**: Full validation and compact minification
-- **JavaScript Branch**: Comment preservation, smart whitespace
-- **Unified Entry Point**: Single script handles both formats
-- **Scoring System**: JavaScript detection uses weighted indicator scoring
+All scripts:
 
-**Decision Logic:**
-```
-1. Extract first non-whitespace character
-2. If '{' or '[' â†’ JSON minification branch
-3. Else â†’ JavaScript scoring (need â‰¥2 indicators)
-4. Apply appropriate algorithm based on type
-```
+- Run locally inside Ditto.
+- Modify only the clipboard text.
+- Return `false` (so they do not cancel the copy operation).
+- Intentionally skip content that is already compact (e.g., single line) to keep Ditto fast.
 
-**Use Case:** Single copy-paste script for mixed JSON/JS workflows
+### `UnifiedMinify.chai`
 
-**File Size:** 8.0 KB
+- If the first non-whitespace character is `{` or `[`, it treats the clip as JSON.
+- Otherwise it uses a small “JS score” (looks for things like `function`, `=>`, `const/let/var`, `class`, `import/export`, etc.).
+- Preserves JavaScript comments (`//` and `/* */`) and supports shebangs.
 
----
+Limits:
 
-## - Installation Guide
+- Skips clips over ~1MB.
 
-### Step 1: Locate Ditto Scripts Directory
-
-#### Windows:
-```
-C:\Users\[YourUsername]\AppData\Local\Ditto
-```
-or
-```
-%LOCALAPPDATA%\Ditto
-```
-
-### Step 2: Place Script Files
+### `JsonMinify.chai`
 
-Copy the `.chai` files to:
-- **On Copy Scripts:** `[DittoDir]\CopyScripts\`
-- **On Paste Scripts:** `[DittoDir]\PasteScripts\`
-
-For these minifiers: **Use Copy Scripts directory** (they run on copy)
-
-Example:
-```
-C:\Users\YourName\AppData\Local\Ditto\CopyScripts\JsonMinify.chai
-C:\Users\YourName\AppData\Local\Ditto\CopyScripts\JSMinify.chai
-C:\Users\YourName\AppData\Local\Ditto\CopyScripts\UnifiedMinify.chai
-```
+- Intended for JSON only.
+- Does basic brace/bracket balance validation, then applies a few regex replacements.
 
-### Step 3: Enable in Ditto
+Limits:
 
-1. Open **Ditto**
-2. Go to **Options â†’ Advanced â†’ On Copy Scripts**
-3. Select the scripts you want to enable:
-   - âœ“ Check `JsonMinify` for JSON-only minification
-   - âœ“ Check `JSMinify` for JavaScript-only minification
-   - âœ“ Check `UnifiedMinify` for automatic detection
-
-   **Note:** Enable only ONE script at a time to avoid double-minification
+- Skips clips over ~1MB.
 
-4. Click **OK** to apply
-
-### Step 4: Restart Ditto
+### `JSMinify.chai`
 
-Close and reopen Ditto for changes to take effect.
+- Intended for JavaScript only.
+- Rejects content that starts with `{` or `[` to avoid JSON.
+- Requires a minimum JS indicator score.
 
----
+Limits:
 
-## - Usage Examples
-
-### Example 1: Minify Formatted JSON
+- Skips clips over ~500KB.
 
-**Before (Copied from IDE):**
-```json
-{
-  "name": "example",
-  "values": [1, 2, 3],
-  "nested": {
-    "key": "value"
-  }
-}
-```
+## Troubleshooting
 
-**After (In Clipboard):**
-```json
-{"name":"example","values":[1,2,3],"nested":{"key":"value"}}
-```
+- If nothing changes when you copy
+  - Ensure the script is enabled in `Options` -> `Advanced` -> `On Copy Scripts`.
+  - Restart Ditto.
 
-âœ… Ditto automatically minifies when you copy
+- If JSON doesn't minify
+  - The first non-whitespace character must be `{` or `[`.
+  - If it is already a single line, the script intentionally skips.
 
----
+- If JavaScript doesn't minify
+  - The snippet must contain enough JS indicators (`const`, `function`, `=>`, etc.).
+  - If it is already a single line, the script intentionally skips.
 
-### Example 2: Minify JavaScript with Comments
+## Security
 
-**Before (Copied from Editor):**
-```javascript
-// Initialize configuration
-const config = {
-  debug: true,
-  timeout: 5000
-};
+These scripts:
 
-// Process data
-function process(data) {
-  if (data.length > 0) {
-    return data.map(x => x * 2);
-  }
-  return [];
-}
-```
+- Do not make network requests.
+- Do not write files.
 
-**After (In Clipboard):**
-```javascript
-// Initialize configuration
-const config={debug:true,timeout:5000};
-// Process data
-function process(data){if(data.length>0){return data.map(x=>x*2);}return [];}
-```
+## References
 
-âœ… Comments preserved, code minified, safe minification
+- Ditto scripting wiki: https://github.com/sabrogden/Ditto/wiki/Scripting
 
----
+## License
 
-### Example 3: Smart Detection (UnifiedMinify)
-
-**Scenario 1 - JSON Input:**
-```
-Paste JSON â†’ UnifiedMinify â†’ JSON minifier applied âœ“
-```
-
-**Scenario 2 - JavaScript Input:**
-```
-Paste JavaScript â†’ UnifiedMinify â†’ JS minifier applied âœ“
-```
-
-**Scenario 3 - Other Text:**
-```
-Paste plain text â†’ No match â†’ Returns unchanged âœ“
-```
-
----
-
-## - Technical Specifications
-
-### Validation & Safety
-
-| Feature | JsonMinify | JSMinify | UnifiedMinify |
-|---------|-----------|----------|---------------|
-| Brace/Bracket Validation | âœ“ | â€” | âœ“ |
-| Escape Sequence Handling | âœ“ | âœ“ | âœ“ |
-| Comment Preservation | â€” | âœ“ | âœ“ |
-| Shebang Support | â€” | âœ“ | âœ“ |
-| Size Guard | 1MB | 500KB | 1MB |
-| Already-Minified Detection | âœ“ | âœ“ | âœ“ |
-| String Literal Safety | âœ“ | âœ“ | âœ“ |
-
-### Performance Metrics
-
-- **JsonMinify:** ~2-5ms for 100KB JSON
-- **JSMinify:** ~5-10ms for 100KB JS
-- **UnifiedMinify:** ~8-15ms (includes detection overhead)
-
-### Size Reduction Examples
-
-| Input | Before | After | Reduction |
-|-------|--------|-------|-----------|
-| Typical API response JSON | 15 KB | 12 KB | ~20% |
-| Node.js module | 8 KB | 6.5 KB | ~18% |
-| Complex config object | 5 KB | 3.8 KB | ~24% |
-
----
-
-## ðŸ“š ChaiScript API Reference
-
-These scripts use the Ditto ChaiScript API. Key functions:
-
-```chaiscript
-// Get/Set clipboard content
-std::string GetAsciiString();
-void SetAsciiString(std::string value);
-
-// Regex operations
-void AsciiTextReplaceRegex(std::string regex, std::string replaceWith);
-BOOL AsciiTextMatchesRegex(std::string regex);
-
-// Metadata
-std::string GetActiveApp();
-std::string GetActiveAppTitle();
-
-// Return value
-return false;  // Continue normal copy/paste
-return true;   // Cancel the operation
-```
-
-**Ditto Version Requirement:** 3.21+ (supports `AsciiTextReplaceRegex`)
-
----
-
-## âš™ï¸ Advanced Configuration
-
-### Custom Size Limits
-
-**Modify size guards in scripts:**
-
-```chaiscript
-// JsonMinify.chai - Line 10
-if (oldString.size() > 1000000)  // Change 1000000 to your limit
-
-// JSMinify.chai - Line 6
-if (oldString.size() > 500000)   // Change 500000 to your limit
-```
-
-### Disable Already-Minified Detection
-
-If you want to minify even already-compact code:
-
-**Remove this block:**
-```chaiscript
-// JsonMinify.chai - Lines 34-37
-if (oldString.find("\n") == -1 && oldString.find("\t") == -1 && oldString.find("\r") == -1)
-{
-    return false;
-}
-```
-
-### Adjust JavaScript Detection Threshold
-
-**UnifiedMinify.chai - Line 120:**
-```chaiscript
-// Change from:
-if (jsScore < 2)  // Need â‰¥2 indicators
-
-// To:
-if (jsScore < 3)  // Need â‰¥3 indicators (stricter)
-```
-
----
-
-## ðŸ› Troubleshooting
-
-### Scripts Not Running
-
-**Issue:** Copy/paste isn't triggering minification
-
-**Solutions:**
-1. Verify files are in correct directory: `C:\Users\[User]\AppData\Local\Ditto\CopyScripts\`
-2. Restart Ditto completely (close all windows)
-3. Check script is enabled in Options â†’ Advanced â†’ On Copy Scripts
-4. Try the **UnifiedMinify** script first (simplest setup)
-
-### JSON Not Minifying
-
-**Issue:** JSON is copied but not minified
-
-**Possible Causes:**
-- JSON already minified (early exit) â†’ Copy expanded version
-- Invalid JSON structure (mismatched braces) â†’ Script rejects it
-- Clipboard size >1MB â†’ Size guard prevents processing
-- Using JSMinify instead of JsonMinify â†’ Use correct script
-
-**Test:**
-1. Copy simple valid JSON: `{ "a": 1 }`
-2. Paste in notepad and check if minified
-
-### JavaScript Not Minifying
-
-**Issue:** JavaScript code not being minified
-
-**Possible Causes:**
-- Missing JavaScript indicators (need â‰¥2) â†’ Add `const` or `function`
-- Using JsonMinify instead of JSMinify â†’ Use correct script
-- Already minified (single line) â†’ Copy expanded version
-- Clipboard size >500KB â†’ Size guard prevents processing
-
-**Debug Check:**
-Look for these patterns in your code:
-- `function` keyword
-- `const`, `let`, or `var`
-- Arrow functions `=>`
-- `class` keyword
-- `import` or `export`
-
-If missing 2+, JSMinify won't run.
-
----
-
-## ðŸ” Security & Best Practices
-
-### What These Scripts Do NOT Do
-
-âŒ Send data to external services
-âŒ Modify file system
-âŒ Access registry
-âŒ Execute external processes
-âŒ Store sensitive data
-
-### Safe to Use With
-
-âœ… API responses
-âœ… Code snippets
-âœ… Configuration files
-âœ… Configuration objects
-âœ… Webpack bundles
-âœ… Build output
-
-### Unsupported (Scripts will skip)
-
-- Binary data
-- Images/multimedia
-- Files >1MB
-- Non-ASCII content
-- Corrupted/invalid syntax
-
----
-
-## ðŸ“ License
-
-MIT License - Feel free to use, modify, and distribute
-
-See [LICENSE](LICENSE) file for details.
-
----
-
-## ðŸ¤ Contributing
-
-Found a bug? Have an improvement?
-
-1. Test thoroughly with your use case
-2. Document the change
-3. Submit issues or pull requests
-
-**Feedback areas:**
-- Edge cases and compatibility
-- Performance improvements
-- Support for additional formats
-- Better detection algorithms
-
----
-
-## – References
-
-- [Ditto Clipboard Manager](https://github.com/sabrogden/Ditto) - Official Repository
-- [Ditto Scripting Wiki](https://github.com/sabrogden/Ditto/wiki/Scripting) - ChaiScript API Reference
-- [ChaiScript Documentation](http://chaiscript.com/) - Language Reference
-
----
-
-## - Keywords & SEO Tags
-
-**Primary Keywords:** Ditto clipboard, ChaiScript, minifier, JSON minification, JavaScript minification, clipboard automation, Windows utility
-
-**Secondary Keywords:** code minifier, clipboard manager script, Ditto plugins, productivity tool, code formatting, regex automation
-
-**Tags:** `ditto` `chaiscript` `minifier` `json` `javascript` `clipboard` `windows` `automation` `productivity`
-
----
-
-## - Repository Stats
-
-- **Total Scripts:** 3
-- **Total Size:** ~15 KB
-- **Supported Ditto:** 3.21.0+
-- **Platform:** Windows
-- **Language:** ChaiScript
-- **License:** MIT
-
----
-
-## - Quick Start Summary
-
-### For JSON Only:
-```
-1. Copy JsonMinify.chai to CopyScripts folder
-2. Enable in Ditto Options â†’ Advanced
-3. Copy formatted JSON â†’ Auto-minified
-```
-
-### For JavaScript Only:
-```
-1. Copy JSMinify.chai to CopyScripts folder
-2. Enable in Ditto Options â†’ Advanced
-3. Copy JS code â†’ Auto-minified (comments preserved)
-```
-
-### For Both (Recommended):
-```
-1. Copy UnifiedMinify.chai to CopyScripts folder
-2. Enable in Ditto Options â†’ Advanced
-3. Copy any format â†’ Smart detection â†’ Auto-minified
-```
-
----
-
-**Questions?** Check the [Ditto Wiki](https://github.com/sabrogden/Ditto/wiki/Scripting) or create an issue on GitHub.
-
----
-
-*Last Updated: January 2026 | Ditto Version: 3.21+ | ChaiScript Version: ChaiScript 6.0+*
+MIT (see [LICENSE](LICENSE)).
