@@ -1,0 +1,179 @@
+// Ditto JavaScript Minifier - Production Grade v1.2 (Strict JS Detection)
+var oldString = clip.GetAsciiString();
+
+if (oldString.size() == 0 || oldString.size() > 500000)
+{
+    return false;
+}
+
+// Trim leading whitespace
+var startIdx = 0;
+while (startIdx < oldString.size() && 
+       (oldString[startIdx] == ' ' || oldString[startIdx] == '\n' || 
+        oldString[startIdx] == '\r' || oldString[startIdx] == '\t'))
+{
+    startIdx = startIdx + 1;
+}
+
+if (startIdx >= oldString.size())
+{
+    return false;
+}
+
+// STRICT: Reject if starts with { or [ (it's JSON, not JS)
+var firstChar = oldString[startIdx];
+if (firstChar == '{' || firstChar == '[')
+{
+    return false;
+}
+
+// STRICT: Must have STRONG JavaScript indicators
+// These patterns don't appear in JSON
+var hasFunction = oldString.find("function ") != -1 || oldString.find("function(") != -1;
+var hasArrow = oldString.find("=>") != -1;
+var hasDeclaration = oldString.find("const ") != -1 || oldString.find("let ") != -1 || oldString.find("var ") != -1;
+var hasClass = oldString.find("class ") != -1;
+var hasImport = oldString.find("import ") != -1 || oldString.find("export ") != -1;
+var hasFor = oldString.find("for (") != -1 || oldString.find("for(") != -1;
+var hasIf = oldString.find("if (") != -1 || oldString.find("if(") != -1;
+var hasReturn = oldString.find("return ") != -1 || oldString.find("return;") != -1;
+
+// Require at least 2 strong indicators
+var jsScore = 0;
+if (hasFunction) { jsScore = jsScore + 2; }
+if (hasArrow) { jsScore = jsScore + 2; }
+if (hasDeclaration) { jsScore = jsScore + 2; }
+if (hasClass) { jsScore = jsScore + 2; }
+if (hasImport) { jsScore = jsScore + 2; }
+if (hasFor) { jsScore = jsScore + 1; }
+if (hasIf) { jsScore = jsScore + 1; }
+if (hasReturn) { jsScore = jsScore + 1; }
+
+// Need score >= 2 to be considered JavaScript
+if (jsScore < 2)
+{
+    return false;
+}
+
+// Already minified check
+if (oldString.find("\n") == -1)
+{
+    return false;
+}
+
+// ... rest of minification code stays the same ...
+var result = "";
+var inString = false;
+var stringChar = ' ';
+var escapeNext = false;
+
+for (var i = 0; i < oldString.size(); ++i)
+{
+    var ch = oldString[i];
+    var nextCh = ' ';
+    if (i + 1 < oldString.size())
+    {
+        nextCh = oldString[i + 1];
+    }
+
+    if (escapeNext)
+    {
+        result = result + ch;
+        escapeNext = false;
+        continue;
+    }
+
+    if (inString)
+    {
+        result = result + ch;
+        if (ch == '\\')
+        {
+            escapeNext = true;
+        }
+        else if (ch == stringChar)
+        {
+            inString = false;
+        }
+        continue;
+    }
+
+    if (ch == '"' || ch == '\'' || ch == '`')
+    {
+        inString = true;
+        stringChar = ch;
+        result = result + ch;
+        continue;
+    }
+
+    if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
+    {
+        if (nextCh == '/' && i + 2 < oldString.size() && oldString[i + 2] == '/')
+        {
+            result = result + ch;
+            continue;
+        }
+        
+        if (result.size() > 0)
+        {
+            var lc = result[result.size() - 1];
+            var needSpace = false;
+            
+            if ((lc >= 'a' && lc <= 'z') || (lc >= 'A' && lc <= 'Z') || 
+                (lc >= '0' && lc <= '9') || lc == '_' || lc == '$')
+            {
+                if ((nextCh >= 'a' && nextCh <= 'z') || (nextCh >= 'A' && nextCh <= 'Z') ||
+                    (nextCh >= '0' && nextCh <= '9') || nextCh == '_' || nextCh == '$')
+                {
+                    needSpace = true;
+                }
+            }
+            
+            if (needSpace)
+            {
+                result = result + ' ';
+            }
+        }
+        continue;
+    }
+
+    if (ch == '/' && nextCh == '/')
+    {
+        result = result + ch;
+        i = i + 1;
+        while (i < oldString.size() && oldString[i] != '\n')
+        {
+            result = result + oldString[i];
+            i = i + 1;
+        }
+        if (i < oldString.size())
+        {
+            result = result + '\n';
+        }
+        continue;
+    }
+
+    if (ch == '/' && nextCh == '*')
+    {
+        result = result + ch;
+        i = i + 1;
+        result = result + oldString[i];
+        i = i + 1;
+        while (i < oldString.size())
+        {
+            result = result + oldString[i];
+            if (oldString[i] == '*' && i + 1 < oldString.size() && oldString[i + 1] == '/')
+            {
+                i = i + 1;
+                result = result + oldString[i];
+                break;
+            }
+            i = i + 1;
+        }
+        continue;
+    }
+
+    result = result + ch;
+}
+
+clip.SetAsciiString(result);
+return false;

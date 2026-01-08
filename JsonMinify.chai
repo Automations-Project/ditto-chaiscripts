@@ -1,0 +1,110 @@
+// Ditto JSON Minifier - Production Grade v1.0
+var oldString = clip.GetAsciiString();
+
+// Quick size checks
+if (oldString.size() == 0)
+{
+    return false;
+}
+
+// Size guard - skip clips over 1MB
+if (oldString.size() > 1000000)
+{
+    return false;
+}
+
+// Trim leading whitespace to find actual content start
+var trimmedStart = 0;
+while (trimmedStart < oldString.size() && 
+       (oldString[trimmedStart] == ' ' || oldString[trimmedStart] == '\n' || 
+        oldString[trimmedStart] == '\r' || oldString[trimmedStart] == '\t'))
+{
+    trimmedStart = trimmedStart + 1;
+}
+
+// Must start with { or [ after whitespace
+if (trimmedStart >= oldString.size() || 
+    (oldString[trimmedStart] != '{' && oldString[trimmedStart] != '['))
+{
+    return false;
+}
+
+// Early exit - already minified (no newlines/tabs = likely already compact)
+if (oldString.find("\n") == -1 && oldString.find("\t") == -1 && oldString.find("\r") == -1)
+{
+    return false;
+}
+
+// Validate matching braces/brackets to reject invalid JSON early
+var openBrace = 0;
+var openBracket = 0;
+var inString = false;
+var escapeNext = false;
+
+for (var i = trimmedStart; i < oldString.size(); ++i)
+{
+    var ch = oldString[i];
+    
+    if (escapeNext)
+    {
+        escapeNext = false;
+        continue;
+    }
+    
+    if (ch == '\\')
+    {
+        escapeNext = true;
+        continue;
+    }
+    
+    if (ch == '"')
+    {
+        inString = !inString;
+        continue;
+    }
+    
+    if (!inString)
+    {
+        if (ch == '{')
+        {
+            openBrace = openBrace + 1;
+        }
+        else if (ch == '}')
+        {
+            openBrace = openBrace - 1;
+        }
+        else if (ch == '[')
+        {
+            openBracket = openBracket + 1;
+        }
+        else if (ch == ']')
+        {
+            openBracket = openBracket - 1;
+        }
+    }
+}
+
+// If braces/brackets don't match, reject
+if (openBrace != 0 || openBracket != 0)
+{
+    return false;
+}
+
+// Minify: Remove newlines, tabs, carriage returns
+clip.AsciiTextReplaceRegex("[\\r\\n\\t]+", "");
+
+// Remove spaces after colons
+clip.AsciiTextReplaceRegex(": +", ":");
+
+// Remove spaces after commas
+clip.AsciiTextReplaceRegex(", +", ",");
+
+// Remove spaces around braces
+clip.AsciiTextReplaceRegex(" *\\{ *", "{");
+clip.AsciiTextReplaceRegex(" *\\} *", "}");
+
+// Remove spaces around brackets
+clip.AsciiTextReplaceRegex(" *\\[ *", "[");
+clip.AsciiTextReplaceRegex(" *\\] *", "]");
+
+return false;

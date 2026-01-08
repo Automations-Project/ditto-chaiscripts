@@ -1,0 +1,280 @@
+// Ditto Unified Minifier - Production Grade v1.1
+// Handles both JSON and JavaScript with automatic detection
+var oldString = clip.GetAsciiString();
+
+// Quick size checks
+if (oldString.size() == 0 || oldString.size() > 1000000)
+{
+    return false;
+}
+
+// Trim leading whitespace
+var startIdx = 0;
+while (startIdx < oldString.size())
+{
+    var c = oldString[startIdx];
+    if (c == ' ' || c == '\n' || c == '\r' || c == '\t')
+    {
+        startIdx = startIdx + 1;
+    }
+    else
+    {
+        break;
+    }
+}
+
+if (startIdx >= oldString.size())
+{
+    return false;
+}
+
+// Already minified check (applies to both)
+if (oldString.find("\n") == -1 && oldString.find("\t") == -1 && oldString.find("\r") == -1)
+{
+    return false;
+}
+
+var firstChar = oldString[startIdx];
+
+// ============================================
+// BRANCH 1: JSON (starts with { or [)
+// ============================================
+if (firstChar == '{' || firstChar == '[')
+{
+    // Validate matching braces/brackets
+    var openBrace = 0;
+    var openBracket = 0;
+    var inString = false;
+    var escapeNext = false;
+
+    for (var i = startIdx; i < oldString.size(); ++i)
+    {
+        var ch = oldString[i];
+        
+        if (escapeNext)
+        {
+            escapeNext = false;
+            continue;
+        }
+        
+        if (ch == '\\')
+        {
+            escapeNext = true;
+            continue;
+        }
+        
+        if (ch == '"')
+        {
+            inString = !inString;
+            continue;
+        }
+        
+        if (!inString)
+        {
+            if (ch == '{') { openBrace = openBrace + 1; }
+            else if (ch == '}') { openBrace = openBrace - 1; }
+            else if (ch == '[') { openBracket = openBracket + 1; }
+            else if (ch == ']') { openBracket = openBracket - 1; }
+        }
+    }
+
+    // Reject invalid JSON
+    if (openBrace != 0 || openBracket != 0)
+    {
+        return false;
+    }
+
+    // Minify JSON with regex
+    clip.AsciiTextReplaceRegex("[\\r\\n\\t]+", "");
+    clip.AsciiTextReplaceRegex(": +", ":");
+    clip.AsciiTextReplaceRegex(", +", ",");
+    clip.AsciiTextReplaceRegex(" *\\{ *", "{");
+    clip.AsciiTextReplaceRegex(" *\\} *", "}");
+    clip.AsciiTextReplaceRegex(" *\\[ *", "[");
+    clip.AsciiTextReplaceRegex(" *\\] *", "]");
+    
+    return false;
+}
+
+// ============================================
+// BRANCH 2: JavaScript (strict detection)
+// ============================================
+
+// Must have strong JavaScript indicators
+var hasFunction = oldString.find("function ") != -1 || oldString.find("function(") != -1;
+var hasArrow = oldString.find("=>") != -1;
+var hasDeclaration = oldString.find("const ") != -1 || oldString.find("let ") != -1 || oldString.find("var ") != -1;
+var hasClass = oldString.find("class ") != -1;
+var hasImport = oldString.find("import ") != -1 || oldString.find("export ") != -1;
+var hasFor = oldString.find("for (") != -1 || oldString.find("for(") != -1;
+var hasIf = oldString.find("if (") != -1 || oldString.find("if(") != -1;
+var hasReturn = oldString.find("return ") != -1 || oldString.find("return;") != -1;
+
+var jsScore = 0;
+if (hasFunction) { jsScore = jsScore + 2; }
+if (hasArrow) { jsScore = jsScore + 2; }
+if (hasDeclaration) { jsScore = jsScore + 2; }
+if (hasClass) { jsScore = jsScore + 2; }
+if (hasImport) { jsScore = jsScore + 2; }
+if (hasFor) { jsScore = jsScore + 1; }
+if (hasIf) { jsScore = jsScore + 1; }
+if (hasReturn) { jsScore = jsScore + 1; }
+
+// Need score >= 2 to be JavaScript
+if (jsScore < 2)
+{
+    return false;
+}
+
+// Minify JavaScript (preserves comments)
+var result = "";
+var inString = false;
+var stringChar = ' ';
+var escapeNext = false;
+var lastWasComment = false;
+
+for (var i = 0; i < oldString.size(); ++i)
+{
+    var ch = oldString[i];
+    var nextCh = ' ';
+    if (i + 1 < oldString.size())
+    {
+        nextCh = oldString[i + 1];
+    }
+
+    if (escapeNext)
+    {
+        result = result + ch;
+        escapeNext = false;
+        lastWasComment = false;
+        continue;
+    }
+
+    if (inString)
+    {
+        result = result + ch;
+        if (ch == '\\') { escapeNext = true; }
+        else if (ch == stringChar) { inString = false; }
+        continue;
+    }
+
+    if (ch == '"' || ch == '\'' || ch == '`')
+    {
+        inString = true;
+        stringChar = ch;
+        result = result + ch;
+        lastWasComment = false;
+        continue;
+    }
+
+    // Handle shebang line (#!/usr/bin/env node)
+    var atStart = result.size() == 0 || result[result.size() - 1] == '\n';
+    if (ch == '#' && nextCh == '!' && atStart)
+    {
+        result = result + ch;
+        i = i + 1;
+        while (i < oldString.size() && oldString[i] != '\n')
+        {
+            result = result + oldString[i];
+            i = i + 1;
+        }
+        if (i < oldString.size()) { result = result + '\n'; }
+        lastWasComment = true;
+        continue;
+    }
+
+    // Whitespace handling
+    if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
+    {
+        // Need newline after comment before code
+        var nextIsIdent = false;
+        if (nextCh >= 'a' && nextCh <= 'z') { nextIsIdent = true; }
+        if (nextCh >= 'A' && nextCh <= 'Z') { nextIsIdent = true; }
+        if (nextCh == '_' || nextCh == '$') { nextIsIdent = true; }
+        
+        if (lastWasComment && nextIsIdent)
+        {
+            if (result.size() > 0 && result[result.size() - 1] != '\n')
+            {
+                result = result + '\n';
+            }
+            lastWasComment = false;
+            continue;
+        }
+        
+        // Keep space between identifiers
+        if (result.size() > 0)
+        {
+            var lc = result[result.size() - 1];
+            var lcIsIdent = false;
+            if (lc >= 'a' && lc <= 'z') { lcIsIdent = true; }
+            if (lc >= 'A' && lc <= 'Z') { lcIsIdent = true; }
+            if (lc >= '0' && lc <= '9') { lcIsIdent = true; }
+            if (lc == '_' || lc == '$') { lcIsIdent = true; }
+            
+            var nextIsIdentOrNum = false;
+            if (nextCh >= 'a' && nextCh <= 'z') { nextIsIdentOrNum = true; }
+            if (nextCh >= 'A' && nextCh <= 'Z') { nextIsIdentOrNum = true; }
+            if (nextCh >= '0' && nextCh <= '9') { nextIsIdentOrNum = true; }
+            if (nextCh == '_' || nextCh == '$') { nextIsIdentOrNum = true; }
+            
+            if (lcIsIdent && nextIsIdentOrNum)
+            {
+                result = result + ' ';
+            }
+        }
+        continue;
+    }
+
+    // Preserve line comments
+    if (ch == '/' && nextCh == '/')
+    {
+        // Add newline before comment if needed
+        if (result.size() > 0)
+        {
+            var lastC = result[result.size() - 1];
+            if (lastC != '\n' && lastC != ' ')
+            {
+                result = result + '\n';
+            }
+        }
+        result = result + ch;
+        i = i + 1;
+        while (i < oldString.size() && oldString[i] != '\n')
+        {
+            result = result + oldString[i];
+            i = i + 1;
+        }
+        result = result + '\n';
+        lastWasComment = true;
+        continue;
+    }
+
+    // Preserve block comments
+    if (ch == '/' && nextCh == '*')
+    {
+        result = result + ch;
+        i = i + 1;
+        result = result + oldString[i];
+        i = i + 1;
+        while (i < oldString.size())
+        {
+            result = result + oldString[i];
+            if (oldString[i] == '*' && i + 1 < oldString.size() && oldString[i + 1] == '/')
+            {
+                i = i + 1;
+                result = result + oldString[i];
+                break;
+            }
+            i = i + 1;
+        }
+        lastWasComment = true;
+        continue;
+    }
+
+    lastWasComment = false;
+    result = result + ch;
+}
+
+clip.SetAsciiString(result);
+return false;
